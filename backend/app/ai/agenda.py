@@ -54,12 +54,16 @@ def _inline_refs(schema: dict) -> dict:
 
 
 TOOL_CONFIG = {
-    "tools": [{"toolSpec": {
-        "name": "record_agenda",
-        "description": "Record the meeting agenda found in the user's text. "
-                       "Leave a field empty when the text does not say it.",
-        "inputSchema": {"json": _inline_refs(ParsedAgenda.model_json_schema())},
-    }}],
+    "tools": [
+        {
+            "toolSpec": {
+                "name": "record_agenda",
+                "description": "Record the meeting agenda found in the user's text. "
+                "Leave a field empty when the text does not say it.",
+                "inputSchema": {"json": _inline_refs(ParsedAgenda.model_json_schema())},
+            }
+        }
+    ],
     "toolChoice": {"tool": {"name": "record_agenda"}},
 }
 
@@ -86,10 +90,18 @@ def _calendar(today: date) -> str:
 
 def parse_agenda(text: str, today: date, tz: str) -> tuple[ParsedAgenda, dict]:
     brt = boto3.client("bedrock-runtime", region_name="us-east-1")
-    messages = [{"role": "user", "content": [{"text":
-                 f"Today is {today:%A} {today.isoformat()}, time zone {tz}.\n"
-                 f"Calendar:\n{_calendar(today)}\n\n"
-                 f"<pasted_text>\n{text}\n</pasted_text>"}]}]
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "text": f"Today is {today:%A} {today.isoformat()}, time zone {tz}.\n"
+                    f"Calendar:\n{_calendar(today)}\n\n"
+                    f"<pasted_text>\n{text}\n</pasted_text>"
+                }
+            ],
+        }
+    ]
     usage = {"input_tokens": 0, "output_tokens": 0}
     for _ in range(2):
         resp = brt.converse(
@@ -110,9 +122,17 @@ def parse_agenda(text: str, today: date, tz: str) -> tuple[ParsedAgenda, dict]:
         except ValidationError as e:
             messages += [
                 message,
-                {"role": "user", "content": [{"toolResult": {
-                    "toolUseId": call["toolUseId"],
-                    "content": [{"text": str(e)}],
-                    "status": "error"}}]},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "toolResult": {
+                                "toolUseId": call["toolUseId"],
+                                "content": [{"text": str(e)}],
+                                "status": "error",
+                            }
+                        }
+                    ],
+                },
             ]
     raise AgendaParseError("the model returned an invalid agenda twice")

@@ -3,8 +3,7 @@ import logging
 import time
 from datetime import date
 
-from app.ai.agenda import (PARSER_MODEL, PROMPT_VERSION, AgendaParseError,
-                           cost_usd, parse_agenda)
+from app.ai.agenda import PARSER_MODEL, PROMPT_VERSION, AgendaParseError, cost_usd, parse_agenda
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -13,9 +12,11 @@ MAX_CHARS = 10_000
 
 
 def _resp(code, body):
-    return {"statusCode": code,
-            "headers": {"content-type": "application/json"},
-            "body": json.dumps(body, ensure_ascii=False)}
+    return {
+        "statusCode": code,
+        "headers": {"content-type": "application/json"},
+        "body": json.dumps(body, ensure_ascii=False),
+    }
 
 
 def handler(event, context):
@@ -35,14 +36,27 @@ def handler(event, context):
         agenda, usage = parse_agenda(text, today, tz)
     except AgendaParseError as e:
         return _resp(422, {"error": str(e)})
-    except Exception as e:  # throttling, мережа, доступ до моделі
+    except Exception:  # throttling, мережа, доступ до моделі
         log.exception("parse failed")
         return _resp(503, {"error": "the parsing service is busy or unavailable"})
 
-    log.info(json.dumps({
-        "event": "agenda_parsed", "model": PARSER_MODEL,
-        "prompt_version": PROMPT_VERSION, **usage,
-        "latency_ms": int((time.monotonic() - started) * 1000),
-        "cost_usd": cost_usd(PARSER_MODEL, usage)}))
-    return _resp(200, {"agenda": agenda.model_dump(mode="json"),
-                       "model": PARSER_MODEL, "prompt_version": PROMPT_VERSION})
+    log.info(
+        json.dumps(
+            {
+                "event": "agenda_parsed",
+                "model": PARSER_MODEL,
+                "prompt_version": PROMPT_VERSION,
+                **usage,
+                "latency_ms": int((time.monotonic() - started) * 1000),
+                "cost_usd": cost_usd(PARSER_MODEL, usage),
+            }
+        )
+    )
+    return _resp(
+        200,
+        {
+            "agenda": agenda.model_dump(mode="json"),
+            "model": PARSER_MODEL,
+            "prompt_version": PROMPT_VERSION,
+        },
+    )
