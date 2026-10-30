@@ -36,7 +36,6 @@ resource "aws_cognito_user_pool" "main" {
     email_sending_account = "COGNITO_DEFAULT"
   }
 
-  user_pool_tags = { PROJECT_NAME = var.project_name }
 
   lifecycle {
     ignore_changes = [schema]
