@@ -93,4 +93,9 @@ resource "aws_cognito_user_pool_client" "web" {
     id_token      = "hours"
     refresh_token = "days"
   }
+
+  # Not readable from the API after import; changing it would replace the client.
+  lifecycle {
+    ignore_changes = [generate_secret]
+  }
 }
