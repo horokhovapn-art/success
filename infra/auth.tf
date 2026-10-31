@@ -62,6 +62,7 @@ resource "aws_cognito_identity_provider" "google" {
     email          = "email"
     email_verified = "email_verified"
     name           = "name"
+    username       = "sub"
   }
 
   # The real client id and secret live in Cognito, not in code.
