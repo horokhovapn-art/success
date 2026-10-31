@@ -93,7 +93,7 @@ define require-db-password
 endef
 
 .PHONY: help up up-build down down-v logs ps migrate revision seed test lint fmt shell-backend psql \
-        aws-whoami aws-deploy aws-deploy-auth aws-auth-env aws-ecr aws-push aws-deploy-backend aws-migrate aws-url aws-status aws-logs \
+        aws-whoami aws-deploy aws-deploy-auth aws-auth-env infra-plan aws-ecr aws-push aws-deploy-backend aws-migrate aws-url aws-status aws-logs \
         aws-frontend-cert aws-deploy-frontend aws-frontend-url aws-destroy
 
 help:
@@ -155,37 +155,17 @@ aws-deploy: ## Deploy everything: sign-in, then the backend, then the frontend b
 	@$(MAKE) --no-print-directory aws-deploy-backend
 	@$(MAKE) --no-print-directory aws-deploy-frontend
 
-aws-deploy-auth: ## Create/update the Cognito user pool (email + password; Google when GOOGLE_CLIENT_ID is set)
-	$(require-aws-credentials)
-	@urls="http://localhost:$(or $(FRONTEND_PORT),3000)/"; \
-		site=$$($(call stack-output,$(FRONTEND_STACK),AllowedOrigins) 2>/dev/null | tr -d '[:space:]'); \
-		case "$$site" in ""|None) ;; *) urls="$$urls,$$(echo "$$site" | sed 's|,|/,|g')/" ;; esac; \
-		echo "Sign-in redirect URLs: $$urls"; \
-		test -n "$(GOOGLE_CLIENT_ID)" || echo "GOOGLE_CLIENT_ID is empty — Google sign-in stays off"; \
-		$(call wait-stack-idle,$(AUTH_STACK)); \
-		$(call clear-failed-create,$(AUTH_STACK)); \
-		$(AWS) cloudformation deploy \
-			--stack-name $(AUTH_STACK) \
-			--template-file infra/auth.yml \
-			--no-fail-on-empty-changeset \
-			$(STACK_TAGS) \
-			--parameter-overrides \
-				"ProjectName=$(PROJECT_NAME)" \
-				"AppUrls=$$urls" \
-				"GoogleClientId=$(GOOGLE_CLIENT_ID)" \
-				"GoogleClientSecret=$(GOOGLE_CLIENT_SECRET)"
-	@if [ -n "$(GOOGLE_CLIENT_ID)" ]; then \
-		echo "Google Cloud console → the OAuth client → Authorized redirect URIs must include:"; \
-		echo "  $$($(call stack-output,$(AUTH_STACK),GoogleRedirectUri) | tr -d '[:space:]')"; \
-	fi
-	@$(MAKE) --no-print-directory aws-auth-env
+aws-deploy-auth: ## Auth is Terraform now: push to main, HCP Terraform plans and applies
+	@echo "Auth (Cognito) is managed by Terraform in infra/*.tf. Push to main and confirm the apply in HCP Terraform."
+	@echo "Use 'make infra-plan' to check the configuration locally."
 
-aws-auth-env: ## Print the Cognito settings to put in .env for local development
-	@$(call stack-outputs,$(AUTH_STACK)) | awk -F '\t' ' \
-		$$1 == "UserPoolId" { print "COGNITO_USER_POOL_ID=" $$2 } \
-		$$1 == "UserPoolClientId" { print "COGNITO_CLIENT_ID=" $$2 } \
-		$$1 == "HostedDomain" { print "COGNITO_DOMAIN=" $$2 } \
-		$$1 == "GoogleEnabled" { print "COGNITO_GOOGLE_ENABLED=" $$2 }' | tr -d '\r'
+aws-auth-env: ## Print the Cognito settings to put in .env (from Terraform outputs)
+	@cd infra && echo "COGNITO_USER_POOL_ID=$$(terraform output -raw user_pool_id)" && \
+		echo "COGNITO_CLIENT_ID=$$(terraform output -raw user_pool_client_id)" && \
+		echo "COGNITO_DOMAIN=$$(terraform output -raw hosted_domain)"
+
+infra-plan: ## Validate the Terraform configuration (applies happen only in HCP Terraform)
+	cd infra && terraform init -backend=false && terraform validate
 
 aws-ecr: ## Create the ECR repository for the backend image
 	$(require-aws-credentials)
